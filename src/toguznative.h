@@ -8,7 +8,7 @@
 #define NO_TUZDEK 18
 
 struct Toguz{
-    std::array<u_int8_t, 18> cells; 
+    alignas(32) std::array<u_int8_t, 18> cells; 
     std::array<u_int8_t, 2> tuzdeks;
     std::array<u_int8_t, 2> scores;
 
