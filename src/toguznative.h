@@ -7,8 +7,12 @@
 
 #define NO_TUZDEK 18
 
+bool toguznative_compiled_with_avx2();
+
+void init_masks();
+
 struct Toguz{
-    alignas(32) std::array<u_int8_t, 18> cells; 
+    alignas(32) std::array<u_int8_t, 32> cells; 
     std::array<u_int8_t, 2> tuzdeks;
     std::array<u_int8_t, 2> scores;
 
@@ -21,6 +25,8 @@ struct ToguzNative : public Toguz{
     ToguzNative();
     void move(u_int8_t idx) override;
     void get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_moves, int& count) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const ToguzNative& game);
 
     private:
     void who_is_winner(int8_t winner) const;

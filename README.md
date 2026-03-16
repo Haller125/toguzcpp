@@ -15,3 +15,6 @@ cmake ..
 cmake --build
 ./toguznative_tests
 ```
+
+
+cmake .. -DCMAKE_BUILD_TYPE=Release
