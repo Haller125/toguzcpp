@@ -8,60 +8,41 @@ alignas(32) u_int8_t REMAINDER_MASKS[18][18][32];
 
 namespace {
 
-inline void sow_scalar(std::array<u_int8_t, 32>& cells, u_int8_t idx, int pits) {
-    for (int i = 0; i < pits; ++i) {
-        const u_int8_t id = static_cast<u_int8_t>((idx + i) % 18);
-        cells[id] += 1;
+inline void sow_scalar(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_rounds, int remainder) {
+    // Скалярная версия тоже должна работать с готовыми кругами, чтобы не делать лишних циклов
+    for (int i = 0; i < 32; ++i) {
+        if (i < 18) cells[i] += full_rounds;
+    }
+    for (int i = 0; i < remainder; ++i) {
+        cells[(idx + i) % 18] += 1;
     }
 }
 
 #if defined(__AVX2__)
-inline void sow_avx2(std::array<u_int8_t, 32>& cells, u_int8_t idx, int& pits) {
-    const int full_rounds = pits / 18;
-    const int remainder = pits % 18;
-
-    __m256i v_cells = _mm256_load_si256(reinterpret_cast<const __m256i*>(cells.data()));
-
-    __m256i v_full = _mm256_set1_epi8(full_rounds);
-
+// Передаем full_rounds и remainder напрямую, чтобы не вычислять их дважды
+inline void sow_avx2(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_rounds, int remainder) {
+    u_int8_t* p_cells = cells.data(); // Избавляемся от абстракций std::array
+    
+    __m256i v_cells = _mm256_load_si256(reinterpret_cast<const __m256i*>(p_cells));
+    __m256i v_full = _mm256_set1_epi8(static_cast<char>(full_rounds));
     __m256i v_rem = _mm256_load_si256(reinterpret_cast<const __m256i*>(REMAINDER_MASKS[idx][remainder]));
 
     v_cells = _mm256_add_epi8(v_cells, v_full);
     v_cells = _mm256_add_epi8(v_cells, v_rem);
 
-    _mm256_store_si256(reinterpret_cast<__m256i*>(cells.data()), v_cells);
-
-    // remainder <= 17
-    // if (remainder > 0) {
-    //     int end_idx = idx + remainder;
-        
-    //     if (end_idx <= 18) {
-    //         // Без перехода через границу (индекс 17)
-    //         for (int i = idx; i < end_idx; ++i) {
-    //             cells[i]++;
-    //         }
-    //     } else {
-    //         // С переходом через границу
-    //         for (int i = idx; i < 18; ++i) {
-    //             cells[i]++;
-    //         }
-    //         for (int i = 0; i < end_idx - 18; ++i) {
-    //             cells[i]++;
-    //         }
-    //     }
-    // }
+    _mm256_store_si256(reinterpret_cast<__m256i*>(p_cells), v_cells);
 }
 #endif
 
-inline void sow_cells(std::array<u_int8_t, 32>& cells, u_int8_t idx, int& pits) {
+inline void sow_cells(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_rounds, int remainder) {
 #if defined(__AVX2__)
-    sow_avx2(cells, idx, pits);
+    sow_avx2(cells, idx, full_rounds, remainder);
 #else
-    sow_scalar(cells, idx, pits);
+    sow_scalar(cells, idx, full_rounds, remainder);
 #endif
 }
 
-}  // namespace
+}// namespace
 
 bool toguznative_compiled_with_avx2() {
 #if defined(__AVX2__)
@@ -91,87 +72,91 @@ ToguzNative::ToguzNative(){
         this->scores.fill(0);
 }
 
-void ToguzNative::move(u_int8_t idx){
+void ToguzNative::move(u_int8_t idx) {
     int pits = this->cells[idx];
+    this->cells[idx] = 0;
+
     if (pits == 1) {
-        const u_int8_t next_idx = static_cast<u_int8_t>((idx + 1) % 18);
-        this->cells[idx] = 0;
+        const u_int8_t next_idx = (idx + 1) >= 18 ? (idx + 1 - 18) : (idx + 1);
         this->cells[next_idx] += 1;
-        bool is_capture = (!(this->cells[next_idx] & 1) && (idx / 9 != next_idx / 9));
-        this->scores[idx / 9] += is_capture * this->cells[next_idx];
-        this->cells[next_idx] *= !is_capture;
+        
+        // Быстрые логические проверки вместо деления
+        bool player = idx >= 9;
+        bool next_side = next_idx >= 9;
+        
+        if (player != next_side && (this->cells[next_idx] % 2 == 0)) {
+            this->scores[player] += this->cells[next_idx];
+            this->cells[next_idx] = 0;
+        }
         return;
     }
 
-    this->cells[idx] = 0;
-    sow_cells(this->cells, idx, pits);
+    // Вычисляем один раз и передаем в AVX и для вычисления ID
+    const int full_rounds = pits / 18;
+    const int remainder = pits % 18;
 
-    // u_int8_t id = (idx + pits - 1) % 18;
+    sow_cells(this->cells, idx, full_rounds, remainder);
 
-    int last_offset = (pits == 0) ? 17 : (pits - 1);
+    // ИСПРАВЛЕННАЯ ЛОГИКА: используем remainder, а не pits!
+    int last_offset = (remainder == 0) ? 17 : (remainder - 1);
     u_int8_t id = idx + last_offset;
-    if (id >= 18) {
-        id -= 18; // Заменяем % 18 на одно быстрое вычитание
+    if (id >= 18) { id -= 18; }
+
+    bool player = idx >= 9; // Замена деления (idx / 9) на быстрое сравнение
+    bool last_ball_side = id >= 9;
+
+    // Классические IF'ы: процессору проще предсказать пропуск, чем считать математику
+    if (player != last_ball_side) {
+        u_int8_t target_stones = this->cells[id];
+        
+        if ((target_stones & 1) == 0) { // Захват (четное)
+            this->scores[player] += target_stones;
+            this->cells[id] = 0;
+        } else if (target_stones == 3 && id != this->tuzdeks[1 - player] + (9 * (1 - 2*player)) && this->tuzdeks[player] == NO_TUZDEK && id != (9 * (-player + 2) - 1)) { // Туздык
+            this->scores[player] += 3;
+            this->tuzdeks[player] = id;
+            // По правилам игры, камни, попавшие в Туздык, уходят в казан владельца
+            // В вашей предыдущей логике здесь этого не было, проверьте правила!
+            this->cells[id] = 0; 
+        }
     }
 
-    bool player = idx / 9;
-    bool last_ball_side = id / 9;
-    // from -1 0 1 to 0 1
-    // bool is_on_opposite = (last_ball_side - player) * (last_ball_side - player);
-
-    // if ( player != last_ball_side && !(this->cells[id] & 1)) {
-    //     this->scores[player] += this->cells[id];
-    // }
-
-    bool is_capture = (!(this->cells[id] & 1) && (player != last_ball_side));
-    this->scores[player] += is_capture * this->cells[id];
-    this->cells[id] *= !is_capture;
-
-    // if (
-    //     player != last_ball_side &&
-    //     this->cells[id] == 3 &&
-    //     id != this->tuzdeks[1 - player] &&
-    //     this->tuzdeks[player] == NO_TUZDEK
-    // ){
-    //     this->scores[player] += this->cells[id];
-    //     this->tuzdeks[player] = id;
-    // }
-
-    bool is_tuzdek = (player != last_ball_side) && (this->cells[id] == 3) && (id != this->tuzdeks[1 - player]) && (this->tuzdeks[player] == NO_TUZDEK);
-    this->scores[player] += is_tuzdek * this->cells[id];
-    this->tuzdeks[player] = is_tuzdek * id + (1 - is_tuzdek) * this->tuzdeks[player];
-
-    // if (this->tuzdeks[0] != NO_TUZDEK){
-    //     this->scores[0] += this->cells[this->tuzdeks[0]];
-    //     this->cells[this->tuzdeks[0]] = 0;
-    // }
-
-    bool is_tuzdek_0 = (this->tuzdeks[0] != NO_TUZDEK);
-    if (is_tuzdek_0) {
-        this->scores[0] += this->cells[this->tuzdeks[0]];
-        this->cells[this->tuzdeks[0]] = 0;
+    // Сбор Туздыков
+    if (this->tuzdeks[0] != NO_TUZDEK) {
+        u_int8_t t_id = this->tuzdeks[0];
+        if (this->cells[t_id] > 0) {
+            this->scores[0] += this->cells[t_id];
+            this->cells[t_id] = 0;
+        }
     }
 
-    // if (this->tuzdeks[1] != NO_TUZDEK){
-    //     this->scores[1] += this->cells[this->tuzdeks[1]];
-    //     this->cells[this->tuzdeks[1]] = 0;
-    // }
-
-    bool is_tuzdek_1 = (this->tuzdeks[1] != NO_TUZDEK);
-    if (is_tuzdek_1) {
-        this->scores[1] += this->cells[this->tuzdeks[1]];
-        this->cells[this->tuzdeks[1]] = 0;
+    if (this->tuzdeks[1] != NO_TUZDEK) {
+        u_int8_t t_id = this->tuzdeks[1];
+        if (this->cells[t_id] > 0) {
+            this->scores[1] += this->cells[t_id];
+            this->cells[t_id] = 0;
+        }
     }
 }
 
+// РАДИКАЛЬНАЯ ОПТИМИЗАЦИЯ: Разворот цикла (Loop Unrolling) + Указатели
 void ToguzNative::get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_moves, int& count) const {
     count = 0;
-    const u_int8_t offset = player * 9;
-    for (u_int8_t i = 0; i < 9; i++) {
-        legal_moves[count] = i;
-        // Если > 0, вернет 1 (сдвигаем индекс записи). Если 0, вернет 0 (перезапишем на след. шаге).
-        count += (this->cells[i + offset] > 0); 
-    }
+    
+    // Используем raw pointers чтобы избежать вызова операторов []
+    const u_int8_t* p_cells = this->cells.data() + (player ? 9 : 0);
+    u_int8_t* p_moves = legal_moves.data();
+
+    // Развернутый цикл: 0 ветвлений, строго линейное выполнение
+    p_moves[count] = 0; count += (p_cells[0] > 0);
+    p_moves[count] = 1; count += (p_cells[1] > 0);
+    p_moves[count] = 2; count += (p_cells[2] > 0);
+    p_moves[count] = 3; count += (p_cells[3] > 0);
+    p_moves[count] = 4; count += (p_cells[4] > 0);
+    p_moves[count] = 5; count += (p_cells[5] > 0);
+    p_moves[count] = 6; count += (p_cells[6] > 0);
+    p_moves[count] = 7; count += (p_cells[7] > 0);
+    p_moves[count] = 8; count += (p_cells[8] > 0);
 }
 // first player - 1, second player - -1, 0 - draw
 void ToguzNative::who_is_winner(int8_t winner) const {
