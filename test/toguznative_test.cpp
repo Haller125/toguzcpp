@@ -231,4 +231,30 @@ TYPED_TEST(ToguzDerivedTest, TuzdekRestrictions) {
   EXPECT_EQ(game.cells[1], 3);
 }
 
+// std::vector<uint8_t> game_indices = {
+//     7,7,9,8,6,3,5,4,3,1,
+//     5,7,1,9,2,2,7,7,9,9,
+//     5,3,1,9,7,2,6,1,3,2,
+//     7,2,6,4,1,8,7,3,2,7,
+//     2,5,8,9,1,4,1,8,1,1,
+//     3,7,1,8,3,2,8,3,7,1,
+//     6,3,5,1,8,8,2,8,7,1,8,7,2,4,6,3,8,8,9,1,8,8,7,7,7,8,8,8,6,5,7,8,8,7,5,4,7,8,6,4,6,5,7,7,5,8,3,2,9,1,7,2,8,1,6,4,5,2,2,7,1,3,2,4,3,5
+//   };
+
+// TEST(ToguzRealGameTest, FullSimulation) {
+//     ToguzNative game;
+//     init_masks();
+    
+//     for (size_t i = 0; i < game_indices.size(); ++i) {
+//         bool is_black = (i % 2 != 0);
+//         std::cout << "\n\nMove " << (i + 1) / 2 << ": " << std::endl;
+//         std::cout << game << std::endl;
+//         uint8_t hole = game_indices[i];
+//         uint8_t idx = (hole - 1) + (is_black ? 9 : 0);
+        
+//         ASSERT_EQ(game.cells[idx] > 0, true) << "Attempting to move from an empty cell at move " << i + 1 << " (index " << static_cast<int>(idx) << ")";
+//         ASSERT_NO_FATAL_FAILURE(game.move(idx)) << "Crashed at move " << i + 1;
+//     }
+// }
+
 }  // namespace

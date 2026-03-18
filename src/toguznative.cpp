@@ -171,10 +171,14 @@ void ToguzNative::who_is_winner(int8_t winner) const {
 }
 
 std::ostream& operator<<(std::ostream& os, const ToguzNative& game) {
-    os << "Cells: ";
-    for (const auto cell : game.cells) {
-        os << static_cast<int>(cell) << " ";
+    os << "Cells: \n";
+    for (int i = 17; i >= 9; --i) {
+        os << static_cast<int>(game.cells[i]) << " ";
     }
+    os << "\n";  
+    for (int i = 0; i < 9; ++i) {
+        os << static_cast<int>(game.cells[i]) << " ";
+    } 
     os << "\nTuzdeks: " << static_cast<int>(game.tuzdeks[0]) << " " << static_cast<int>(game.tuzdeks[1]);
     os << "\nScores: " << static_cast<int>(game.scores[0]) << " " << static_cast<int>(game.scores[1]);
     return os;
