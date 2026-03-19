@@ -17,4 +17,19 @@ cmake --build
 ```
 
 
+```
+cd build
+rm -rf *  # Clean old build
+
+# Release build (optimized, portable)
 cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Or Debug build
+cmake .. -DCMAKE_TYPE=Debug
+
+# Specify compiler explicitly if needed
+cmake .. -DCMAKE_CXX_COMPILER=g++-13 -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_BUILD_TYPE=Release
+
+cmake --build .
+```
