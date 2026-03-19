@@ -119,6 +119,7 @@ private:
             bool player = false;
             std::array<uint8_t, 9> moves;
             int move_count;
+            int turns;
 
 
             // Играем партию до конца
@@ -132,19 +133,22 @@ private:
                 seed = r;
 
                 // Сохраняем позицию в буфер
-                PositionRecord rec;
-                std::memcpy(rec.cells, game.cells.data(), 18);
-                rec.tuzdeks[0] = game.tuzdeks[0];
-                rec.tuzdeks[1] = game.tuzdeks[1];
-                rec.scores[0] = game.scores[0];
-                rec.scores[1] = game.scores[1];
-                buffer.push_back(rec);
+                if (turns > 8){
+                    PositionRecord rec;
+                    std::memcpy(rec.cells, game.cells.data(), 18);
+                    rec.tuzdeks[0] = game.tuzdeks[0];
+                    rec.tuzdeks[1] = game.tuzdeks[1];
+                    rec.scores[0] = game.scores[0];
+                    rec.scores[1] = game.scores[1];
+                    buffer.push_back(rec);
+                }
 
                 if (buffer.size() >= buffer_capacity) {
                     flush_buffer(buffer);
                 }
                 
                 player = !player;
+                turns++;
             }
         }
     }
