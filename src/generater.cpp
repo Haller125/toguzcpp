@@ -13,9 +13,7 @@
 #define KMAXTURNS 5000
 
 struct PositionRecord{
-    u_int8_t cells[18];
-    u_int8_t tuzdeks[2];
-    u_int8_t scores[2];
+    u_int8_t data[22]; // 18 байт для клеток, 2 байта для туздеков, 2 байта для счетов
 };
 
 uint32_t rng_state = 123456789;
@@ -133,11 +131,11 @@ private:
 
                 // Сохраняем позицию в буфер
                 PositionRecord rec;
-                std::memcpy(rec.cells, game.cells.data(), 18);
-                rec.tuzdeks[0] = game.tuzdeks[0];
-                rec.tuzdeks[1] = game.tuzdeks[1];
-                rec.scores[0] = game.scores[0];
-                rec.scores[1] = game.scores[1];
+                std::memcpy(rec.data, game.cells.data(), 18);
+                rec.data[18] = game.tuzdeks[0];
+                rec.data[19] = game.tuzdeks[1];
+                rec.data[20] = game.scores[0];
+                rec.data[21] = game.scores[1];
                 buffer.push_back(rec);
 
                 if (buffer.size() >= buffer_capacity) {
@@ -162,9 +160,24 @@ private:
     uint64_t total_target;
 };
 
-int main() {
-    uint64_t billon = 1'000'000'000;
-    DatasetGenerator gen("toguz_data.bin", 5 * billon);
+int main(int argc, char* argv[]) {
+
+    // first argument: number of positions to generate, default 1 million
+    // second argument: output filename, default "toguz_data.bin"
+
+    uint64_t positions_to_generate = 1000000; // default 1 million
+    std::string filename = "toguz_data.bin";
+    if (argc > 1) {
+        const int parsed = std::atoi(argv[1]);
+        if (parsed > 0) {
+            positions_to_generate = static_cast<std::uint64_t>(parsed);
+        }
+        if (argc > 2) {
+            filename = argv[2];
+        }
+    }
+    DatasetGenerator gen(filename, positions_to_generate);
     gen.start(std::thread::hardware_concurrency());
+
     return 0;
 }
