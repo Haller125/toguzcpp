@@ -108,6 +108,8 @@ target_link_libraries(toguz_try PRIVATE toguznative)
 add_executable(generate src/generater.cpp)
 target_link_libraries(generate PRIVATE toguznative)
 
+add_executable(dataset_clean src/dataset_clean.cpp)
+
 # ============================================================================
 # Tests
 # ============================================================================

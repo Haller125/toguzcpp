@@ -117,6 +117,7 @@ private:
             bool player = false;
             std::array<uint8_t, 9> moves;
             int move_count;
+            int turns;
 
 
             // Играем партию до конца
@@ -143,6 +144,7 @@ private:
                 }
                 
                 player = !player;
+                turns++;
             }
         }
     }
