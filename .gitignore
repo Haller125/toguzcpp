@@ -2,3 +2,4 @@ build/
 valgring/
 venv/
 *.bin
+__pycache__/
