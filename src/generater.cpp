@@ -131,14 +131,15 @@ private:
                 seed = r;
 
                 // Сохраняем позицию в буфер
-                PositionRecord rec;
-                std::memcpy(rec.data, game.cells.data(), 18);
-                rec.data[18] = game.tuzdeks[0];
-                rec.data[19] = game.tuzdeks[1];
-                rec.data[20] = game.scores[0];
-                rec.data[21] = game.scores[1];
-                buffer.push_back(rec);
-
+                if (turns >= 6) { // Сохраняем позиции, начиная с 7-го хода
+                    PositionRecord rec;
+                    std::memcpy(rec.data, game.cells.data(), 18);
+                    rec.data[18] = game.tuzdeks[0];
+                    rec.data[19] = game.tuzdeks[1];
+                    rec.data[20] = game.scores[0];
+                    rec.data[21] = game.scores[1];
+                    buffer.push_back(rec);
+                }
                 if (buffer.size() >= buffer_capacity) {
                     flush_buffer(buffer);
                 }

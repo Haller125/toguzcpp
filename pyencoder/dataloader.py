@@ -9,29 +9,30 @@ class LargeBinaryDataset(Dataset):
         self.dtype = dtype
         self.input_size = input_size
 
-        data_test = np.memmap(file_path, dtype=self.dtype, mode='r')
-        self.num_samples = len(data_test)
-        self.data = None # Будет инициализировано внутри __getitem__
-
+        # Get number of samples without keeping memmap open
+        temp_data = np.memmap(file_path, dtype=self.dtype, mode='r')
+        self.num_samples = len(temp_data)
+        del temp_data
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
-        # Ленивая инициализация: открываем memmap в каждом воркере отдельно.
-        # Это предотвращает проблемы с общими файловыми дескрипторами в многопоточности.
-        if self.data is None:
-            self.data = np.memmap(self.file_path, dtype=self.dtype, mode='r')
-        
-        datapoint = np.clip(np.array(self.data[idx]).astype(np.int16), 0, 39)
+        temp_data = np.memmap(self.file_path, dtype=self.dtype, mode='r')
+        datapoint = temp_data[idx].astype(np.uint32)  
+        del temp_data
 
-        sample = np.zeros(self.input_size, dtype=np.float32)
+        datapoint[0:18] = np.clip(datapoint[0:18], 0, 39)
+        datapoint[20:22] = np.clip(datapoint[20:22], 0, 81)
+
+        sample = np.zeros(self.input_size, dtype=np.float16)
         
         sample = transform_data(datapoint, sample)
 
         return torch.from_numpy(sample)
     
 
-def transform_data(datapoint, sample):
+def transform_data(datapoint, sample):  
+
     for i in range(0, 18):
         sample[i*40+datapoint[i]] = 1
 
@@ -51,7 +52,7 @@ def transform_data(datapoint, sample):
 
     return sample
 
-def get_data_loader(file_path, batch_size=128, num_workers=4):
+def get_data_loader(file_path, batch_size=128, num_workers=1):
     dataset = LargeBinaryDataset(file_path)
     
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=False)
