@@ -116,8 +116,9 @@ private:
             ToguzNative game;
             bool player = false;
             std::array<uint8_t, 9> moves;
-            int move_count;
-            int turns;
+            moves.fill(0);
+            int move_count = 0;
+            int turns = 0;
 
 
             // Играем партию до конца
