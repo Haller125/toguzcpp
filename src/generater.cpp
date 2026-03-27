@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
     uint64_t positions_to_generate = 1000000; // default 1 million
     std::string filename = "toguz_data.bin";
     if (argc > 1) {
-        const int parsed = std::stoull(argv[1]);
+        const uint64_t parsed = std::stoull(argv[1]);
         if (parsed > 0) {
             positions_to_generate = static_cast<std::uint64_t>(parsed);
         }
