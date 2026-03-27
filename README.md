@@ -33,3 +33,7 @@ cmake .. -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_BUILD_TYPE=Release
 
 cmake --build .
 ```
+
+```
+python main.py --file-path toguz_data.bin --batch-size 256 --num-epochs 100 --learning-rate 0.001 --num-workers 4 --input-size 902 --hidden-size 22
+```
