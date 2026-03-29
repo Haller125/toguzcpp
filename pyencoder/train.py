@@ -1,8 +1,12 @@
-from torch import nn, optim, tensor
+import torch
+from torch import nn, optim
 
 
 def train_autoencoder(autoencoder, data_loader, num_epochs, initial_lr, patience=5):
-    pos_weight = tensor([90.0]) # Example weight to favor '1's
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    autoencoder = autoencoder.to(device)
+
+    pos_weight = torch.tensor([90.0], device=device) # Example weight to favor '1's
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     
     optimizer = optim.Adam(autoencoder.parameters(), lr=initial_lr)
@@ -16,6 +20,8 @@ def train_autoencoder(autoencoder, data_loader, num_epochs, initial_lr, patience
         autoencoder.train()
         
         for data in data_loader:
+            data = data.to(device, non_blocking=True).float()
+
             # Forward pass
             reconstructed = autoencoder(data)
             loss = criterion(reconstructed, data)

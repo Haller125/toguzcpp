@@ -54,5 +54,11 @@ def transform_data(datapoint, sample):
 
 def get_data_loader(file_path, batch_size=128, num_workers=1):
     dataset = LargeBinaryDataset(file_path)
-    
-    return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=False)
+
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+    )
