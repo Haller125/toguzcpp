@@ -28,6 +28,19 @@ struct ToguzNative : public Toguz{
 
     friend std::ostream& operator<<(std::ostream& os, const ToguzNative& game);
 
-    private:
+
     void who_is_winner(int8_t winner) const;
 };
+
+struct ZobristHash {
+    std::array<u_int64_t, 18*162> cell_hashes; // [cell_index*162+stone_count]
+    std::array<u_int64_t, 16> tuzdek_hashes; // [tuzdek_index] doesn't matter what player, tuzdek ids are unique across both players
+    std::array<u_int64_t, 82*2> score_hashes; // [player*82+score_value]
+    u_int64_t turn_hash; // For player to move
+
+    ZobristHash();
+    u_int64_t hash(const ToguzNative& game) const;
+    ~ZobristHash() = default;
+};
+
+void atsyrau(ToguzNative& game, bool player);

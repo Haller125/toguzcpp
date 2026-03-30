@@ -4,7 +4,11 @@
 #include <immintrin.h>
 #include <cstring>
 
+#define HASH_SEED 123456789
+
 alignas(32) u_int8_t REMAINDER_MASKS[18][18][32];
+
+
 
 namespace {
 
@@ -182,4 +186,39 @@ std::ostream& operator<<(std::ostream& os, const ToguzNative& game) {
     os << "\nTuzdeks: " << static_cast<int>(game.tuzdeks[0]) << " " << static_cast<int>(game.tuzdeks[1]);
     os << "\nScores: " << static_cast<int>(game.scores[0]) << " " << static_cast<int>(game.scores[1]);
     return os;
+}
+
+ZobristHash::ZobristHash() {
+    std::mt19937_64 rng(HASH_SEED); // Фиксированный сид для воспроизводимости
+    std::uniform_int_distribution<u_int64_t> dist;
+
+    for (auto& h : cell_hashes) h = dist(rng);
+    for (auto& h : tuzdek_hashes) h = dist(rng);
+    for (auto& h : score_hashes) h = dist(rng);
+    turn_hash = dist(rng);
+}
+
+u_int64_t ZobristHash::hash(const ToguzNative& game) const {
+    u_int64_t h = 0;
+
+    for (int i = 0; i < 18; ++i) {
+        u_int8_t stone_count = game.cells[i];
+        h ^= cell_hashes[i * 162 + stone_count];
+    }
+
+    for (int p = 0; p < 2; ++p) {
+        if (game.tuzdeks[p] != NO_TUZDEK) {
+            h ^= tuzdek_hashes[game.tuzdeks[p]];
+        }
+        h ^= score_hashes[p * 82 + game.scores[p]];
+    }
+    return h;
+}
+
+// Calls when player has no legal moves
+void atsyrau(ToguzNative& game, bool player) {
+    for (int i = 9 - (player * 9); i < 18 - (player * 9); ++i) {
+        game.scores[1 - player] += game.cells[i];
+        game.cells[i] = 0;
+    }
 }
