@@ -39,7 +39,7 @@ struct ZobristHash {
     u_int64_t turn_hash; // For player to move
 
     ZobristHash();
-    u_int64_t hash(const ToguzNative& game) const;
+    u_int64_t hash(const ToguzNative& game, bool player_turn) const;
     ~ZobristHash() = default;
 };
 

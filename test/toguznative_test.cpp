@@ -1,6 +1,9 @@
 #include <cstdint>
 #include <numeric>
 #include <type_traits>
+#include <unordered_map>
+#include <random>
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -256,5 +259,93 @@ TYPED_TEST(ToguzDerivedTest, TuzdekRestrictions) {
 //         ASSERT_NO_FATAL_FAILURE(game.move(idx)) << "Crashed at move " << i + 1;
 //     }
 // }
+
+TEST(ZobristHashTest, Determinism) {
+    ZobristHash hasher1;
+    ZobristHash hasher2;
+    
+    ToguzNative game;
+    EXPECT_EQ(hasher1.hash(game, true), hasher2.hash(game, true));
+    EXPECT_EQ(hasher1.hash(game, false), hasher2.hash(game, false));
+}
+
+TEST(ZobristHashTest, Basic) {
+    ZobristHash hasher;
+    ToguzNative game1;
+    ToguzNative game2;
+    
+    // Same state -> same hash
+    EXPECT_EQ(hasher.hash(game1, true), hasher.hash(game2, true));
+    
+    // Different turn -> different hash
+    EXPECT_NE(hasher.hash(game1, true), hasher.hash(game2, false));
+    
+    // One stone change
+    game2.cells[0] -= 1;
+    game2.cells[1] += 1;
+    EXPECT_NE(hasher.hash(game1, true), hasher.hash(game2, true));
+    
+    // Tuzdek change
+    game1.tuzdeks[0] = 5;
+    EXPECT_NE(hasher.hash(game1, true), hasher.hash(game2, false)); // Wait, even with same turn it changes.
+    EXPECT_NE(hasher.hash(game1, true), hasher.hash(game2, true));
+    game2.tuzdeks[0] = 5;
+    
+    // Score change
+    game1.scores[0] += 5;
+    EXPECT_NE(hasher.hash(game1, true), hasher.hash(game2, true));
+}
+
+struct ToguzStateStr {
+    static std::string serialize(const ToguzNative& game, bool turn) {
+        std::string s;
+        s.reserve(18 * 3 + 20);
+        for (int i = 0; i < 18; ++i) s += std::to_string(game.cells[i]) + ",";
+        s += std::to_string(game.tuzdeks[0]) + ",";
+        s += std::to_string(game.tuzdeks[1]) + ",";
+        s += std::to_string(game.scores[0]) + ",";
+        s += std::to_string(game.scores[1]) + ",";
+        s += turn ? "1" : "0";
+        return s;
+    }
+};
+
+TEST(ZobristHashTest, Collisions) {
+    ZobristHash hasher;
+    std::unordered_map<uint64_t, std::string> seen_hashes;
+    
+    ToguzNative game;
+    init_masks();
+    
+    std::mt19937 rng(42);
+    bool turn = true;
+    
+    // Generate random walk
+    for (int i = 0; i < 50000; ++i) {
+        uint64_t h = hasher.hash(game, turn);
+        std::string state_str = ToguzStateStr::serialize(game, turn);
+        
+        auto it = seen_hashes.find(h);
+        if (it != seen_hashes.end()) {
+            EXPECT_EQ(it->second, state_str) << "Hash collision detected!";
+        } else {
+            seen_hashes[h] = state_str;
+        }
+        
+        // Random move
+        std::array<std::uint8_t, 9> legal_moves;
+        int count = 0;
+        game.get_legal_moves(turn, legal_moves, count);
+        
+        if (count > 0) {
+            std::uniform_int_distribution<int> dist(0, count - 1);
+            game.move(legal_moves[dist(rng)]);
+        } else {
+            // No moves available, reset game to generate more states
+            game = ToguzNative();
+        }
+        turn = !turn;
+    }
+}
 
 }  // namespace

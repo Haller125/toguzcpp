@@ -3,10 +3,10 @@
 #include <climits>
 #include <vector>
 
-#define WHITEWINS INT_MAX
-#define BLACKWINS INT_MIN
+#define WIN INT_MAX
+#define LOSE INT_MIN
 
-enum class TTFlag : uint8_t {
+enum class TTFlag : u_int8_t {
     Exact,
     LowerBound,
     UpperBound
@@ -33,6 +33,6 @@ struct TT{
     void store(const u_int64_t hash, const int depth, const int score, const u_int8_t best_move, const TTFlag flag);
 };
 
-int search(ToguzNative& node, int depth, int alpha, int beta, bool player, int& best_move, std::array<u_int8_t, 9>& legal_moves_buffer, int& legal_count_buffer);
+int search_depth(ToguzNative& node, int depth, int alpha, int beta, bool player, u_int8_t& best_move, TT& tt, ZobristHash& zobrist_hasher);
 
 int score(const ToguzNative& game, bool player);

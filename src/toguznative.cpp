@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <immintrin.h>
 #include <cstring>
+#include <random>
 
 #define HASH_SEED 123456789
 
@@ -198,7 +199,7 @@ ZobristHash::ZobristHash() {
     turn_hash = dist(rng);
 }
 
-u_int64_t ZobristHash::hash(const ToguzNative& game) const {
+u_int64_t ZobristHash::hash(const ToguzNative& game, bool player_turn) const {
     u_int64_t h = 0;
 
     for (int i = 0; i < 18; ++i) {
@@ -212,6 +213,11 @@ u_int64_t ZobristHash::hash(const ToguzNative& game) const {
         }
         h ^= score_hashes[p * 82 + game.scores[p]];
     }
+
+    if (player_turn) {
+        h ^= turn_hash;
+    }
+
     return h;
 }
 

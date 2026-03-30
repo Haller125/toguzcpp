@@ -74,6 +74,7 @@ message(STATUS "C++ Flags: ${CMAKE_CXX_FLAGS}")
 # ============================================================================
 add_library(toguznative STATIC
     src/toguznative.cpp
+    src/search.cpp
 )
 
 # AVX2 support - check CPU and compiler capabilities
@@ -110,6 +111,9 @@ target_link_libraries(generate PRIVATE toguznative)
 
 add_executable(dataset_clean src/clean_dataset.cpp)
 
+add_executable(search_depth_benchmark src/search_depth_benchmark.cpp)
+target_link_libraries(search_depth_benchmark PRIVATE toguznative)
+
 # ============================================================================
 # Tests
 # ============================================================================
@@ -119,7 +123,7 @@ include(FetchContent)
 find_package(GTest QUIET)
 
 if(GTest_FOUND OR GTEST_FOUND)
-    add_executable(toguznative_tests test/toguznative_test.cpp)
+    add_executable(toguznative_tests test/toguznative_test.cpp test/tt_test.cpp)
     target_link_libraries(toguznative_tests PRIVATE toguznative GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(toguznative_tests)
