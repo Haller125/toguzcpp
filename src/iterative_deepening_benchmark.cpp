@@ -8,23 +8,23 @@
 #include <string>
 
 int main(int argc, char* argv[]) {
-    int min_depth = 1;
     int max_depth = 10;
-    std::string output_path = "search_depth_timings.txt";
+    u_int64_t time_limit_ms = 1000000;
+    std::string output_path = "iterative_deepening_timings.txt";
 
     if (argc >= 2) {
         max_depth = std::stoi(argv[1]);
     }
     if (argc >= 3) {
-        min_depth = std::stoi(argv[2]);
+        time_limit_ms = static_cast<u_int64_t>(std::stoull(argv[2]));
     }
     if (argc >= 4) {
         output_path = argv[3];
     }
 
-    if (min_depth <= 0 || max_depth <= 0 || min_depth > max_depth) {
-        std::cerr << "Invalid depth range. Use positive values and ensure min_depth <= max_depth.\n";
-        std::cerr << "Usage: ./search_depth_benchmark [max_depth] [min_depth] [output_file]\n";
+    if (max_depth <= 0 || time_limit_ms == 0) {
+        std::cerr << "Invalid arguments. Ensure max_depth is positive and time_limit_ms > 0.\n";
+        std::cerr << "Usage: ./iterative_deepening_benchmark [max_depth] [time_limit_ms] [output_file]\n";
         return 1;
     }
 
@@ -38,17 +38,18 @@ int main(int argc, char* argv[]) {
 
     ZobristHash zobrist_hasher;
 
-    for (int depth = min_depth; depth <= max_depth; ++depth) {
+    for (int depth = 1; depth <= max_depth; ++depth) {
         ToguzNative node;
         TT tt;
         u_int8_t best_move = NOMOVE;
-        std::atomic<bool> stop_search(false);
 
         const auto start = std::chrono::steady_clock::now();
-        const int evaluation = search_depth(node, depth, LOSE, WIN, false, best_move, tt, zobrist_hasher, stop_search);
+        const int evaluation = iterative_deepening(time_limit_ms, node, false, best_move, tt, zobrist_hasher, depth);
         const auto end = std::chrono::steady_clock::now();
 
         tt.clear();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(time_limit_ms));
 
         const double elapsed_ms =
             std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end - start).count();
@@ -58,6 +59,7 @@ int main(int argc, char* argv[]) {
         std::cout << "depth=" << depth
                   << " eval=" << evaluation
                   << " best_move=" << static_cast<int>(best_move)
+                  << " time_limit=" << time_limit_ms << " ms"
                   << " time=" << std::fixed << std::setprecision(3) << elapsed_ms << " ms\n";
     }
 
