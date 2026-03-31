@@ -64,8 +64,6 @@ int search_depth(ToguzNative& node, int depth, int alpha, int beta, bool player,
             continue; 
         }
 
-        // captures handling awaits
-
         if (move == killer_moves[depth][0]) {
             move_scores[i] += 100000;
         } else if (move == killer_moves[depth][1]) {

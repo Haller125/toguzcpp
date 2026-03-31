@@ -110,7 +110,6 @@ void ToguzNative::move(u_int8_t idx) {
     bool player = idx >= 9; // Замена деления (idx / 9) на быстрое сравнение
     bool last_ball_side = id >= 9;
 
-    // Классические IF'ы: процессору проще предсказать пропуск, чем считать математику
     if (player != last_ball_side) {
         u_int8_t target_stones = this->cells[id];
         
@@ -120,8 +119,6 @@ void ToguzNative::move(u_int8_t idx) {
         } else if (target_stones == 3 && id != this->tuzdeks[1 - player] + (9 * (1 - 2*player)) && this->tuzdeks[player] == NO_TUZDEK && id != (9 * (-player + 2) - 1)) { // Туздык
             this->scores[player] += 3;
             this->tuzdeks[player] = id;
-            // По правилам игры, камни, попавшие в Туздык, уходят в казан владельца
-            // В вашей предыдущей логике здесь этого не было, проверьте правила!
             this->cells[id] = 0; 
         }
     }
@@ -144,7 +141,6 @@ void ToguzNative::move(u_int8_t idx) {
     }
 }
 
-// РАДИКАЛЬНАЯ ОПТИМИЗАЦИЯ: Разворот цикла (Loop Unrolling) + Указатели
 void ToguzNative::get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_moves, int& count) const {
     count = 0;
     
