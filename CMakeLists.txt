@@ -117,6 +117,9 @@ target_link_libraries(search_depth_benchmark PRIVATE toguznative)
 add_executable(iterative_deepening_benchmark src/iterative_deepening_benchmark.cpp)
 target_link_libraries(iterative_deepening_benchmark PRIVATE toguznative)
 
+add_executable(qlearning src/qlearning.cpp)
+target_link_libraries(qlearning PRIVATE toguznative)
+
 # ============================================================================
 # Tests
 # ============================================================================

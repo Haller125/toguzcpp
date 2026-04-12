@@ -9,7 +9,7 @@ int main(int argc, char const *argv[])
 
     init_masks();
 
-    game.move(12);
+    atsyrau(game, 0); // first player
 
     std::cout << game << std::endl;
 

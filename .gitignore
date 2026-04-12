@@ -3,3 +3,5 @@ valgring/
 venv/
 *.bin
 __pycache__/
+*.txt
+.vscode/

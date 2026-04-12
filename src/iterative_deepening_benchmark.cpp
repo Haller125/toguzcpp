@@ -84,7 +84,7 @@ int apply_random_legal_moves(ToguzNative& game, bool& player_to_move, int random
 
         std::uniform_int_distribution<int> pick(0, count - 1);
         const u_int8_t local_move = legal_moves[pick(rng)];
-        const u_int8_t board_idx = local_move + (player_to_move ? 9 : 0);
+        const u_int8_t board_idx = local_move;
         game.move(board_idx);
 
         player_to_move = !player_to_move;

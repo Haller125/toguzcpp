@@ -24,9 +24,8 @@ inline void sow_scalar(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_r
 }
 
 #if defined(__AVX2__)
-// Передаем full_rounds и remainder напрямую, чтобы не вычислять их дважды
 inline void sow_avx2(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_rounds, int remainder) {
-    u_int8_t* p_cells = cells.data(); // Избавляемся от абстракций std::array
+    u_int8_t* p_cells = cells.data(); 
     
     __m256i v_cells = _mm256_load_si256(reinterpret_cast<const __m256i*>(p_cells));
     __m256i v_full = _mm256_set1_epi8(static_cast<char>(full_rounds));
@@ -141,6 +140,15 @@ void ToguzNative::move(u_int8_t idx) {
     }
 }
 
+bool ToguzNative::is_atsyrau(bool player) const {
+    for (int i = player * 9; i < 9 * player + 9; ++i) {
+        if (this->cells[i] > 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void ToguzNative::get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_moves, int& count) const {
     count = 0;
     
@@ -149,15 +157,15 @@ void ToguzNative::get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_mo
     u_int8_t* p_moves = legal_moves.data();
 
     // Развернутый цикл: 0 ветвлений, строго линейное выполнение
-    p_moves[count] = 0; count += (p_cells[0] > 0);
-    p_moves[count] = 1; count += (p_cells[1] > 0);
-    p_moves[count] = 2; count += (p_cells[2] > 0);
-    p_moves[count] = 3; count += (p_cells[3] > 0);
-    p_moves[count] = 4; count += (p_cells[4] > 0);
-    p_moves[count] = 5; count += (p_cells[5] > 0);
-    p_moves[count] = 6; count += (p_cells[6] > 0);
-    p_moves[count] = 7; count += (p_cells[7] > 0);
-    p_moves[count] = 8; count += (p_cells[8] > 0);
+    p_moves[count] = 0 + (player ? 9 : 0); count += (p_cells[0] > 0);
+    p_moves[count] = 1 + (player ? 9 : 0); count += (p_cells[1] > 0);
+    p_moves[count] = 2 + (player ? 9 : 0); count += (p_cells[2] > 0);
+    p_moves[count] = 3 + (player ? 9 : 0); count += (p_cells[3] > 0);
+    p_moves[count] = 4 + (player ? 9 : 0); count += (p_cells[4] > 0);
+    p_moves[count] = 5 + (player ? 9 : 0); count += (p_cells[5] > 0);
+    p_moves[count] = 6 + (player ? 9 : 0); count += (p_cells[6] > 0);
+    p_moves[count] = 7 + (player ? 9 : 0); count += (p_cells[7] > 0);
+    p_moves[count] = 8 + (player ? 9 : 0); count += (p_cells[8] > 0);
 }
 // first player - 1, second player - -1, 0 - draw
 void ToguzNative::who_is_winner(int8_t winner) const {
@@ -186,7 +194,7 @@ std::ostream& operator<<(std::ostream& os, const ToguzNative& game) {
 }
 
 ZobristHash::ZobristHash() {
-    std::mt19937_64 rng(HASH_SEED); // Фиксированный сид для воспроизводимости
+    std::mt19937_64 rng(HASH_SEED);
     std::uniform_int_distribution<u_int64_t> dist;
 
     for (auto& h : cell_hashes) h = dist(rng);
@@ -217,10 +225,25 @@ u_int64_t ZobristHash::hash(const ToguzNative& game, bool player_turn) const {
     return h;
 }
 
+u_int64_t ZobristHash::hash_cells(const std::array<u_int8_t, 18>& cells, bool player_turn) const {
+    u_int64_t h = 0;
+
+    for (int i = 0; i < 18; ++i) {
+        u_int8_t stone_count = cells[i];
+        h ^= cell_hashes[i * 162 + stone_count];
+    }
+
+    if (player_turn) {
+        h ^= turn_hash;
+    }
+
+    return h;
+}
+
 // Calls when player has no legal moves
 void atsyrau(ToguzNative& game, bool player) {
-    for (int i = 9 - (player * 9); i < 18 - (player * 9); ++i) {
-        game.scores[1 - player] += game.cells[i];
+    for (int i = 0; i < 18; ++i) {
+        game.scores[i / 9] += game.cells[i];
         game.cells[i] = 0;
     }
 }

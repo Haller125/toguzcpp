@@ -27,7 +27,7 @@ struct ToguzNative : public Toguz{
     void get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_moves, int& count) const;
 
     friend std::ostream& operator<<(std::ostream& os, const ToguzNative& game);
-
+    bool is_atsyrau(bool player) const;
 
     void who_is_winner(int8_t winner) const;
 };
@@ -40,6 +40,8 @@ struct ZobristHash {
 
     ZobristHash();
     u_int64_t hash(const ToguzNative& game, bool player_turn) const;
+    // for qlearning
+    u_int64_t hash_cells(const std::array<u_int8_t, 18>& cells, bool player_turn) const; 
     ~ZobristHash() = default;
 };
 

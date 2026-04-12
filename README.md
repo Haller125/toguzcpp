@@ -16,6 +16,21 @@ cmake --build
 ./toguznative_tests
 ```
 
+### Run Tabular Self-Q Learning
+
+```
+cd build
+cmake ..
+cmake --build .
+
+# Train with defaults and save Q-table to qtable_selfplay.txt
+./qlearning_selfplay
+
+# Example custom run:
+# episodes alpha gamma eps_start eps_min eps_decay log_every qtable_out qtable_in delta_scale terminal_bonus terminal_score_scale
+./qlearning_selfplay 50000 0.1 0.99 0.2 0.02 0.99995 1000 qtable_selfplay.txt "" 1.0 100.0 1.0
+```
+
 
 ```
 cd build
