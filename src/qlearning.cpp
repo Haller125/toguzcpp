@@ -269,12 +269,23 @@ namespace qlrng{
         }
 
         return best_move;
-    }   
+    }
 
-    struct BaseLearningProcess {
+    u_int8_t select_random_legal_action(const ToguzNative& game, bool player_turn) {
+        std::array<u_int8_t, 9> legal_moves;
+        int legal_count = 0;
+        game.get_legal_moves(player_turn, legal_moves, legal_count);
+
+        if (legal_count == 0) {
+            return NO_LEGAL_MOVE;
+        }
+
+        return legal_moves[rand() % legal_count];
+    }
+
+
+    struct QSelfLearningProcess {
         QToguzTable q_toguz_table;
-
-        virtual void run_episode(ToguzNative& game, int episode, bool player_turn = 0) = 0;
 
         void train(int episodes, const std::string& save_filename) {
             init_masks();
@@ -283,6 +294,7 @@ namespace qlrng{
                 run_episode(game, i);
                 if ((i + 1) % 1000 == 0) {
                     std::cout << "Episode " << (i + 1) << "/" << episodes << " completed. Q-table size: " << q_toguz_table.q_table.table.size() << std::endl;
+                    sanity_test_against_random(100); // Run a quick sanity test every 1000 episodes
                 }
             }
             save_q_table(save_filename);
@@ -320,58 +332,8 @@ namespace qlrng{
                 atsyrau(game, !player_turn);
             }
         }
-    };
 
-    // requires rework
-    struct QRandomLearningProcess : public BaseLearningProcess {
-        u_int8_t get_random_legal_move(const ToguzNative& game, bool player_turn) {
-            std::array<u_int8_t, 9> legal_moves;
-            int legal_count = 0;
-            game.get_legal_moves(player_turn, legal_moves, legal_count);
-
-            if(legal_count == 0) {
-                return NO_LEGAL_MOVE; 
-            }
-
-            int random_idx = rand() % legal_count;
-            return legal_moves[random_idx];
-        }
-
-        void run_episode(ToguzNative& game, int episode, bool player_turn = 0) override {
-            bool switch_loop = true;
-            while (switch_loop) {
-                ToguzNative next_game = game;                
-                u_int8_t action_idx = select_legal_action(next_game, player_turn, q_toguz_table);
-                if (action_idx == NO_LEGAL_MOVE) {
-                    atsyrau(next_game, player_turn);
-                    action_idx = 0;
-                } else {
-                    next_game.move(action_idx);
-                    u_int8_t random_move = get_random_legal_move(next_game, !player_turn);
-
-                    if (random_move == NO_LEGAL_MOVE) {
-                        atsyrau(next_game, !player_turn);
-                    } else {
-                        next_game.move(random_move);
-                    }
-                } 
-
-                if (next_game.scores[0] >= 81 || next_game.scores[1] >= 81) {
-                    switch_loop = false;
-                }
-
-                float reward = calculate_reward(game, next_game, player_turn);
-                q_toguz_table.update_q_value(game, next_game, player_turn, action_idx, reward);
-
-                game = next_game;
-            }
-                
-            q_toguz_table.decay_epsilon(episode);
-        }
-    };
-
-    struct QSelfLearningProcess : public BaseLearningProcess {
-        void run_episode(ToguzNative& game, int episode, bool player_turn = 0) override {
+        void run_episode(ToguzNative& game, int episode, bool player_turn = 0) {
             bool switch_loop = true;
             while (switch_loop) {
                 ToguzNative next_game = game;                
@@ -395,14 +357,75 @@ namespace qlrng{
 
             q_toguz_table.decay_epsilon(episode);
         }
+
+        void sanity_test_against_random(int games = 200, bool alternate_sides = true) {
+            if (games <= 0) {
+                std::cout << "Sanity test skipped: games must be > 0." << std::endl;
+                return;
+            }
+
+            float original_epsilon = q_toguz_table.q_table.epsilon;
+            q_toguz_table.q_table.epsilon = 0.0f;
+
+            int wins = 0;
+            int losses = 0;
+            int draws = 0;
+
+            for (int game_idx = 0; game_idx < games; ++game_idx) {
+                ToguzNative game;
+                bool learner_side = (alternate_sides && (game_idx % 2 == 1)) ? 1 : 0;
+                bool player_turn = 0;
+
+                bool switch_loop = true;
+                while (switch_loop) {
+                    u_int8_t action_idx = NO_LEGAL_MOVE;
+
+                    if (player_turn == learner_side) {
+                        action_idx = select_legal_action(game, player_turn, q_toguz_table);
+                    } else {
+                        action_idx = select_random_legal_action(game, player_turn);
+                    }
+
+                    if (action_idx == NO_LEGAL_MOVE) {
+                        atsyrau(game, player_turn);
+                    } else {
+                        game.move(action_idx);
+                    }
+
+                    handle_atsyrau(game, player_turn);
+
+                    if (game.scores[0] >= 81 || game.scores[1] >= 81 || game.is_atsyrau(0) || game.is_atsyrau(1)) {
+                        switch_loop = false;
+                    }
+
+                    player_turn = !player_turn;
+                }
+
+                if (game.scores[learner_side] > game.scores[!learner_side]) {
+                    ++wins;
+                } else if (game.scores[learner_side] < game.scores[!learner_side]) {
+                    ++losses;
+                } else {
+                    ++draws;
+                }
+            }
+
+            q_toguz_table.q_table.epsilon = original_epsilon;
+
+            float win_rate = static_cast<float>(wins) * 100.0f / static_cast<float>(games);
+            std::cout << "Sanity test vs random: games=" << games
+                      << " W/L/D=" << wins << "/" << losses << "/" << draws
+                      << " win_rate=" << win_rate << "%" << std::endl;
+        }
     };
 }
 
 int main(int argc, char* argv[]) {
     srand(static_cast<unsigned int>(42));
 
-    std::string mode = "random";
+    std::string mode = "self";
     int episodes = 50000;
+    int sanity_games = 0;
     std::string load_file = "";
     std::string save_file = "q_table.txt";
 
@@ -412,6 +435,8 @@ int main(int argc, char* argv[]) {
             mode = argv[++i];
         } else if ((arg == "-e" || arg == "--episodes") && i + 1 < argc) {
             episodes = std::stoi(argv[++i]);
+        } else if (arg == "--sanity-games" && i + 1 < argc) {
+            sanity_games = std::stoi(argv[++i]);
         } else if ((arg == "-l" || arg == "--load") && i + 1 < argc) {
             load_file = argv[++i];
         } else if ((arg == "-s" || arg == "--save") && i + 1 < argc) {
@@ -419,8 +444,9 @@ int main(int argc, char* argv[]) {
         } else if (arg == "-h" || arg == "--help") {
             std::cout << "Usage: " << argv[0] << " [options]\n"
                       << "Options:\n"
-                      << "  -m, --mode <random|self>   Training mode (default: random)\n"
+                      << "  -m, --mode <random|self>   Training mode (default: self)\n"
                       << "  -e, --episodes <num>       Number of episodes (default: 50000)\n"
+                      << "  --sanity-games <num>       Run self-policy sanity test vs random after training\n"
                       << "  -l, --load <file>          Load Q-table from file\n"
                       << "  -s, --save <file>          Save Q-table to file (default: q_table.txt)\n"
                       << "  -h, --help                 Show this help message\n";
@@ -432,18 +458,15 @@ int main(int argc, char* argv[]) {
     }
     qlrng::k = episodes;
 
-    if (mode == "random") {
-        qlrng::QRandomLearningProcess process;
-        if (!load_file.empty()) {
-            process.load_q_table(load_file);
-        }
-        process.train(episodes, save_file);
-    } else if (mode == "self") {
+    if (mode == "self") {
         qlrng::QSelfLearningProcess self_process;
         if (!load_file.empty()) {
             self_process.load_q_table(load_file);
         }
         self_process.train(episodes, save_file);
+        if (sanity_games > 0) {
+            self_process.sanity_test_against_random(sanity_games);
+        }
     } else {
         std::cerr << "Invalid mode: " << mode << ". Use 'random' or 'self'.\n";
         return 1;
