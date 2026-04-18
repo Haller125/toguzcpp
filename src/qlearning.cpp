@@ -13,7 +13,7 @@ u_int8_t NO_LEGAL_MOVE = 255;
 
 namespace qlrng{
     float k = 0.0f;
-    float min_epsilon = 0.0001f;
+    float min_epsilon = 0.01f;
 
     using QActionValues = std::array<float, 9>;
     
@@ -283,6 +283,30 @@ namespace qlrng{
         return legal_moves[rand() % legal_count];
     }
 
+    u_int8_t select_best_legal_action(const ToguzNative& game, bool player_turn, QToguzTable& q_toguz_table) {
+        std::array<u_int8_t, 9> legal_moves;
+        int legal_count = 0;
+        game.get_legal_moves(player_turn, legal_moves, legal_count);
+
+        if (legal_count == 0) {
+            return NO_LEGAL_MOVE;
+        }
+
+        u_int8_t best_move = legal_moves[0];
+        float max_q = -std::numeric_limits<float>::infinity();
+
+        for (int i = 0; i < legal_count; ++i) {
+            u_int8_t move = legal_moves[i];
+            float q_val = q_toguz_table.get_q_value(game, player_turn, move);
+            
+            if (q_val > max_q) {
+                max_q = q_val;
+                best_move = move;
+            }
+        }
+
+        return best_move;
+    }
 
     struct QSelfLearningProcess {
         QToguzTable q_toguz_table;
@@ -292,9 +316,9 @@ namespace qlrng{
             for (int i = 0; i < episodes; ++i) {
                 ToguzNative game;
                 run_episode(game, i);
-                if ((i + 1) % 1000 == 0) {
+                if ((i + 1) % 10000 == 0) {
                     std::cout << "Episode " << (i + 1) << "/" << episodes << " completed. Q-table size: " << q_toguz_table.q_table.table.size() << std::endl;
-                    sanity_test_against_random(100); // Run a quick sanity test every 1000 episodes
+                    sanity_test_against_random(100); // Run a quick sanity test every 10000 episodes
                 }
             }
             save_q_table(save_filename);
@@ -364,9 +388,6 @@ namespace qlrng{
                 return;
             }
 
-            float original_epsilon = q_toguz_table.q_table.epsilon;
-            q_toguz_table.q_table.epsilon = 0.0f;
-
             int wins = 0;
             int losses = 0;
             int draws = 0;
@@ -381,7 +402,7 @@ namespace qlrng{
                     u_int8_t action_idx = NO_LEGAL_MOVE;
 
                     if (player_turn == learner_side) {
-                        action_idx = select_legal_action(game, player_turn, q_toguz_table);
+                        action_idx = select_best_legal_action(game, player_turn, q_toguz_table);
                     } else {
                         action_idx = select_random_legal_action(game, player_turn);
                     }
@@ -409,8 +430,6 @@ namespace qlrng{
                     ++draws;
                 }
             }
-
-            q_toguz_table.q_table.epsilon = original_epsilon;
 
             float win_rate = static_cast<float>(wins) * 100.0f / static_cast<float>(games);
             std::cout << "Sanity test vs random: games=" << games
