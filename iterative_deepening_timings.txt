@@ -1,62 +1,44 @@
-=== Monte Carlo Iterative Deepening Benchmark ===
-depth=10 time_limit_ms=999 simulations=50 random_moves=6
-sim=1 random_applied=6 player=0 eval=-4 best_move=3 time_ms=9.986
-sim=2 random_applied=6 player=0 eval=18 best_move=1 time_ms=7.678
-sim=3 random_applied=6 player=0 eval=17 best_move=3 time_ms=14.227
-sim=4 random_applied=6 player=0 eval=24 best_move=2 time_ms=8.847
-sim=5 random_applied=6 player=0 eval=21 best_move=0 time_ms=15.423
-sim=6 random_applied=6 player=0 eval=52 best_move=2 time_ms=17.341
-sim=7 random_applied=6 player=0 eval=22 best_move=8 time_ms=12.232
-sim=8 random_applied=6 player=0 eval=34 best_move=4 time_ms=13.159
-sim=9 random_applied=6 player=0 eval=38 best_move=8 time_ms=15.392
-sim=10 random_applied=6 player=0 eval=3 best_move=2 time_ms=7.650
-sim=11 random_applied=6 player=0 eval=5 best_move=1 time_ms=11.998
-sim=12 random_applied=6 player=0 eval=26 best_move=3 time_ms=7.849
-sim=13 random_applied=6 player=0 eval=41 best_move=3 time_ms=12.178
-sim=14 random_applied=6 player=0 eval=51 best_move=5 time_ms=8.805
-sim=15 random_applied=6 player=0 eval=51 best_move=6 time_ms=8.906
-sim=16 random_applied=6 player=0 eval=34 best_move=0 time_ms=15.334
-sim=17 random_applied=6 player=0 eval=24 best_move=5 time_ms=8.891
-sim=18 random_applied=6 player=0 eval=22 best_move=2 time_ms=9.980
-sim=19 random_applied=6 player=0 eval=39 best_move=6 time_ms=8.932
-sim=20 random_applied=6 player=0 eval=42 best_move=1 time_ms=13.293
-sim=21 random_applied=6 player=0 eval=2147483647 best_move=4 time_ms=3.439
-sim=22 random_applied=6 player=0 eval=7 best_move=4 time_ms=12.198
-sim=23 random_applied=6 player=0 eval=18 best_move=1 time_ms=7.792
-sim=24 random_applied=6 player=0 eval=60 best_move=3 time_ms=11.137
-sim=25 random_applied=6 player=0 eval=34 best_move=6 time_ms=10.009
-sim=26 random_applied=6 player=0 eval=-8 best_move=3 time_ms=14.376
-sim=27 random_applied=6 player=0 eval=46 best_move=5 time_ms=6.688
-sim=28 random_applied=6 player=0 eval=56 best_move=0 time_ms=11.022
-sim=29 random_applied=6 player=0 eval=56 best_move=3 time_ms=17.166
-sim=30 random_applied=6 player=0 eval=38 best_move=4 time_ms=18.638
-sim=31 random_applied=6 player=0 eval=22 best_move=6 time_ms=8.709
-sim=32 random_applied=6 player=0 eval=65 best_move=2 time_ms=17.278
-sim=33 random_applied=6 player=0 eval=17 best_move=4 time_ms=14.251
-sim=34 random_applied=6 player=0 eval=43 best_move=5 time_ms=12.059
-sim=35 random_applied=6 player=0 eval=26 best_move=3 time_ms=8.840
-sim=36 random_applied=6 player=0 eval=23 best_move=2 time_ms=5.658
-sim=37 random_applied=6 player=0 eval=58 best_move=6 time_ms=9.943
-sim=38 random_applied=6 player=0 eval=41 best_move=0 time_ms=13.935
-sim=39 random_applied=6 player=0 eval=38 best_move=1 time_ms=15.393
-sim=40 random_applied=6 player=0 eval=28 best_move=4 time_ms=13.131
-sim=41 random_applied=6 player=0 eval=22 best_move=2 time_ms=9.937
-sim=42 random_applied=6 player=0 eval=51 best_move=2 time_ms=13.091
-sim=43 random_applied=6 player=0 eval=22 best_move=6 time_ms=6.646
-sim=44 random_applied=6 player=0 eval=51 best_move=7 time_ms=9.892
-sim=45 random_applied=6 player=0 eval=34 best_move=3 time_ms=10.937
-sim=46 random_applied=6 player=0 eval=7 best_move=2 time_ms=7.843
-sim=47 random_applied=6 player=0 eval=32 best_move=2 time_ms=10.931
-sim=48 random_applied=6 player=0 eval=40 best_move=3 time_ms=7.822
-sim=49 random_applied=6 player=0 eval=42 best_move=0 time_ms=9.996
-sim=50 random_applied=6 player=0 eval=28 best_move=0 time_ms=12.167
 --- Summary ---
-runs=50
-mean_ms=11.180
-median_ms=10.934
-min_ms=3.439
-max_ms=18.638
-stddev_ms=3.301
-p90_ms=15.396
-p95_ms=17.228
+runs=100
+mean_ms=984.292
+median_ms=875.755
+min_ms=368.104
+max_ms=6762.936
+stddev_ms=666.913
+p90_ms=1260.139
+p95_ms=1344.374
+
+
+--- Summary ---
+runs=100
+mean_ms=1054.486
+median_ms=895.367
+min_ms=353.132
+max_ms=6573.012
+stddev_ms=722.887
+p90_ms=1419.953
+p95_ms=1643.463
+
+
+--- Summary ---
+runs=100
+mean_ms=106.100
+median_ms=95.696
+min_ms=44.903
+max_ms=956.878
+stddev_ms=91.070
+p90_ms=129.586
+p95_ms=136.849
+
+=== Monte Carlo Iterative Deepening Benchmark ===
+depth=14 time_limit_ms=9999 simulations=100 random_moves=5
+--- Summary ---
+runs=100
+mean_ms=2045.374
+median_ms=1519.709
+min_ms=424.572
+max_ms=9999.003
+stddev_ms=1700.868
+p90_ms=3572.541
+p95_ms=4965.518
 

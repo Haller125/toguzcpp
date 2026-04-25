@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
 project(toguzcpp LANGUAGES CXX)
 
+# Let IDEs consume the exact compiler flags/includes used by CMake targets.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # ============================================================================
 # Compiler Version Requirements
 # ============================================================================
@@ -70,6 +73,20 @@ set(CMAKE_CXX_FLAGS "${COMMON_FLAGS} ${ARCHITECTURE_FLAGS} ${OPTIMIZATION_FLAGS}
 message(STATUS "C++ Flags: ${CMAKE_CXX_FLAGS}")
 
 # ============================================================================
+# Nanobind 
+# ============================================================================
+
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+# Detect the installed nanobind package and import it into CMake
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
+find_package(nanobind CONFIG REQUIRED)
+
+nanobind_add_module(toguz bindings/toguz_bindings.cpp )
+target_link_libraries(toguz PRIVATE toguznative)
+# ============================================================================
 # Main Library
 # ============================================================================
 add_library(toguznative STATIC
@@ -129,7 +146,11 @@ include(FetchContent)
 find_package(GTest QUIET)
 
 if(GTest_FOUND OR GTEST_FOUND)
-    add_executable(toguznative_tests test/toguznative_test.cpp test/tt_test.cpp)
+    add_executable(toguznative_tests
+        test/toguznative_test.cpp
+        test/tt_test.cpp
+        test/iterative_deepening_test.cpp
+    )
     target_link_libraries(toguznative_tests PRIVATE toguznative GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(toguznative_tests)

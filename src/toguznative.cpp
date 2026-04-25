@@ -1,8 +1,8 @@
 #include "toguznative.h"
 
-#include <algorithm>
-#include <immintrin.h>
 #include <cstring>
+#include <immintrin.h>
+#include <mutex>
 #include <random>
 
 #define HASH_SEED 123456789
@@ -10,13 +10,65 @@
 alignas(32) u_int8_t REMAINDER_MASKS[18][18][32];
 
 
-
 namespace {
 
+std::once_flag remainder_masks_init_once;
+
+inline bool is_on_second_player_side(u_int8_t pit_idx) {
+    return pit_idx >= 9;
+}
+
+inline u_int8_t mirrored_opponent_tuzdek(u_int8_t opponent_tuzdek, bool player) {
+    return static_cast<u_int8_t>(
+        static_cast<int>(opponent_tuzdek) + (player ? -9 : 9)
+    );
+}
+
+inline bool is_forbidden_tuzdek_pit(u_int8_t pit_idx, bool player) {
+    return pit_idx == static_cast<u_int8_t>(player ? 8 : 17);
+}
+
+inline bool can_create_tuzdek(const ToguzNative& game, bool player, u_int8_t pit_idx) {
+    if (game.tuzdeks[player] != NO_TUZDEK) {
+        return false;
+    }
+
+    if (is_forbidden_tuzdek_pit(pit_idx, player)) {
+        return false;
+    }
+
+    const u_int8_t opponent_tuzdek = game.tuzdeks[1 - player];
+    if (opponent_tuzdek != NO_TUZDEK && pit_idx == mirrored_opponent_tuzdek(opponent_tuzdek, player)) {
+        return false;
+    }
+
+    return true;
+}
+
+inline void collect_tuzdek_stones(ToguzNative& game, bool player, Move& move_record) {
+    const u_int8_t tuzdek_idx = game.tuzdeks[player];
+    if (tuzdek_idx == NO_TUZDEK) {
+        return;
+    }
+
+    const u_int8_t collected = game.cells[tuzdek_idx];
+    if (collected == 0) {
+        return;
+    }
+
+    game.scores[player] += collected;
+    move_record.delta_scores[player] += collected;
+    game.cells[tuzdek_idx] = 0;
+}
+
+alignas(32) const u_int8_t ACTIVE_CELL_MASK[32] = {
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+};
+
 inline void sow_scalar(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_rounds, int remainder) {
-    // Скалярная версия тоже должна работать с готовыми кругами, чтобы не делать лишних циклов
-    for (int i = 0; i < 32; ++i) {
-        if (i < 18) cells[i] += full_rounds;
+    for (int i = 0; i < 18; ++i) {
+        cells[i] += full_rounds;
     }
     for (int i = 0; i < remainder; ++i) {
         cells[(idx + i) % 18] += 1;
@@ -29,8 +81,10 @@ inline void sow_avx2(std::array<u_int8_t, 32>& cells, u_int8_t idx, int full_rou
     
     __m256i v_cells = _mm256_load_si256(reinterpret_cast<const __m256i*>(p_cells));
     __m256i v_full = _mm256_set1_epi8(static_cast<char>(full_rounds));
+    __m256i v_active = _mm256_load_si256(reinterpret_cast<const __m256i*>(ACTIVE_CELL_MASK));
     __m256i v_rem = _mm256_load_si256(reinterpret_cast<const __m256i*>(REMAINDER_MASKS[idx][remainder]));
 
+    v_full = _mm256_and_si256(v_full, v_active);
     v_cells = _mm256_add_epi8(v_cells, v_full);
     v_cells = _mm256_add_epi8(v_cells, v_rem);
 
@@ -57,41 +111,76 @@ bool toguznative_compiled_with_avx2() {
 }
 
 void init_masks() {
-    std::memset(REMAINDER_MASKS, 0, sizeof(REMAINDER_MASKS));
-    
-    for (int idx = 0; idx < 18; ++idx) {
-        for (int rem = 0; rem < 18; ++rem) {
-            // Имитируем распределение для каждого возможного случая
-            for (int i = 0; i < rem; ++i) {
-                int target = (idx + i) % 18;
-                REMAINDER_MASKS[idx][rem][target] = 1;
+    std::call_once(remainder_masks_init_once, []() {
+        std::memset(REMAINDER_MASKS, 0, sizeof(REMAINDER_MASKS));
+
+        for (int idx = 0; idx < 18; ++idx) {
+            for (int rem = 0; rem < 18; ++rem) {
+                for (int i = 0; i < rem; ++i) {
+                    int target = (idx + i) % 18;
+                    REMAINDER_MASKS[idx][rem][target] = 1;
+                }
             }
         }
-    }
+    });
 }
 
 ToguzNative::ToguzNative(){
         this->cells.fill(9);
         this->tuzdeks.fill(NO_TUZDEK);
         this->scores.fill(0);
+        init_masks();
+
+        for (int i = 0; i < 1024; ++i) {
+            move_history[i] = Move{};
+        }
 }
 
 void ToguzNative::move(u_int8_t idx) {
+    Move& move_record = move_history[++last_move_index];
+    move_record.prev_cells = this->cells;
+    move_record.prev_tuzdeks = this->tuzdeks;
+    move_record.prev_scores = this->scores;
+    move_record.delta_scores[0] = 0;
+    move_record.delta_scores[1] = 0;
+    move_record.is_caused_tuzdek = false;
+    move_record.idx = idx;
+    move_record.player = is_on_second_player_side(idx);
+
     int pits = this->cells[idx];
+
+    move_record.idx_before = pits;
     this->cells[idx] = 0;
 
     if (pits == 1) {
         const u_int8_t next_idx = (idx + 1) >= 18 ? (idx + 1 - 18) : (idx + 1);
+        const u_int8_t stones_before = this->cells[next_idx];
         this->cells[next_idx] += 1;
+        move_record.id = next_idx;
+        move_record.id_before = stones_before;
         
-        // Быстрые логические проверки вместо деления
-        bool player = idx >= 9;
-        bool next_side = next_idx >= 9;
+        bool player = move_record.player;
+        bool next_side = is_on_second_player_side(next_idx);
         
-        if (player != next_side && (this->cells[next_idx] % 2 == 0)) {
-            this->scores[player] += this->cells[next_idx];
-            this->cells[next_idx] = 0;
+        if (player != next_side) {
+            u_int8_t target_stones = this->cells[next_idx];
+
+            if ((target_stones & 1) == 0) {
+                this->scores[player] += target_stones;
+                move_record.delta_scores[player] += target_stones;
+                this->cells[next_idx] = 0;
+            } else if (target_stones == 3 && can_create_tuzdek(*this, player, next_idx)) {
+                this->scores[player] += 3;
+                this->tuzdeks[player] = next_idx;
+                this->cells[next_idx] = 0;
+
+                move_record.is_caused_tuzdek = true;
+                move_record.delta_scores[player] += 3;
+            }
         }
+
+        collect_tuzdek_stones(*this, false, move_record);
+        collect_tuzdek_stones(*this, true, move_record);
         return;
     }
 
@@ -99,45 +188,47 @@ void ToguzNative::move(u_int8_t idx) {
     const int full_rounds = pits / 18;
     const int remainder = pits % 18;
 
-    sow_cells(this->cells, idx, full_rounds, remainder);
-
-    // ИСПРАВЛЕННАЯ ЛОГИКА: используем remainder, а не pits!
     int last_offset = (remainder == 0) ? 17 : (remainder - 1);
     u_int8_t id = idx + last_offset;
     if (id >= 18) { id -= 18; }
+    move_record.id = id;
+    move_record.id_before = this->cells[id]; 
+    sow_cells(this->cells, idx, full_rounds, remainder);
 
-    bool player = idx >= 9; // Замена деления (idx / 9) на быстрое сравнение
-    bool last_ball_side = id >= 9;
+    bool player = move_record.player;
+    bool last_ball_side = is_on_second_player_side(id);
 
     if (player != last_ball_side) {
         u_int8_t target_stones = this->cells[id];
         
-        if ((target_stones & 1) == 0) { // Захват (четное)
+        if ((target_stones & 1) == 0) {
             this->scores[player] += target_stones;
+            move_record.delta_scores[player] += target_stones;
             this->cells[id] = 0;
-        } else if (target_stones == 3 && id != this->tuzdeks[1 - player] + (9 * (1 - 2*player)) && this->tuzdeks[player] == NO_TUZDEK && id != (9 * (-player + 2) - 1)) { // Туздык
+        } else if (target_stones == 3 && can_create_tuzdek(*this, player, id)) {
             this->scores[player] += 3;
             this->tuzdeks[player] = id;
             this->cells[id] = 0; 
+
+            move_record.is_caused_tuzdek = true;
+            move_record.delta_scores[player] += 3;
         }
     }
 
-    // Сбор Туздыков
-    if (this->tuzdeks[0] != NO_TUZDEK) {
-        u_int8_t t_id = this->tuzdeks[0];
-        if (this->cells[t_id] > 0) {
-            this->scores[0] += this->cells[t_id];
-            this->cells[t_id] = 0;
-        }
-    }
+    collect_tuzdek_stones(*this, false, move_record);
+    collect_tuzdek_stones(*this, true, move_record);
+}
 
-    if (this->tuzdeks[1] != NO_TUZDEK) {
-        u_int8_t t_id = this->tuzdeks[1];
-        if (this->cells[t_id] > 0) {
-            this->scores[1] += this->cells[t_id];
-            this->cells[t_id] = 0;
-        }
-    }
+void ToguzNative::unmove() {
+    if (last_move_index < 0) return; // Нет ходов для отмены
+
+    const Move& last_move = move_history[last_move_index];
+
+    this->cells = last_move.prev_cells;
+    this->tuzdeks = last_move.prev_tuzdeks;
+    this->scores = last_move.prev_scores;
+
+    --last_move_index;
 }
 
 bool ToguzNative::is_atsyrau(bool player) const {
@@ -151,21 +242,20 @@ bool ToguzNative::is_atsyrau(bool player) const {
 
 void ToguzNative::get_legal_moves(bool player, std::array<u_int8_t, 9>& legal_moves, int& count) const {
     count = 0;
+    const u_int8_t base_idx = player ? 9 : 0;
     
-    // Используем raw pointers чтобы избежать вызова операторов []
-    const u_int8_t* p_cells = this->cells.data() + (player ? 9 : 0);
+    const u_int8_t* p_cells = this->cells.data() + base_idx;
     u_int8_t* p_moves = legal_moves.data();
 
-    // Развернутый цикл: 0 ветвлений, строго линейное выполнение
-    p_moves[count] = 0 + (player ? 9 : 0); count += (p_cells[0] > 0);
-    p_moves[count] = 1 + (player ? 9 : 0); count += (p_cells[1] > 0);
-    p_moves[count] = 2 + (player ? 9 : 0); count += (p_cells[2] > 0);
-    p_moves[count] = 3 + (player ? 9 : 0); count += (p_cells[3] > 0);
-    p_moves[count] = 4 + (player ? 9 : 0); count += (p_cells[4] > 0);
-    p_moves[count] = 5 + (player ? 9 : 0); count += (p_cells[5] > 0);
-    p_moves[count] = 6 + (player ? 9 : 0); count += (p_cells[6] > 0);
-    p_moves[count] = 7 + (player ? 9 : 0); count += (p_cells[7] > 0);
-    p_moves[count] = 8 + (player ? 9 : 0); count += (p_cells[8] > 0);
+    p_moves[count] = base_idx + 0; count += (p_cells[0] > 0);
+    p_moves[count] = base_idx + 1; count += (p_cells[1] > 0);
+    p_moves[count] = base_idx + 2; count += (p_cells[2] > 0);
+    p_moves[count] = base_idx + 3; count += (p_cells[3] > 0);
+    p_moves[count] = base_idx + 4; count += (p_cells[4] > 0);
+    p_moves[count] = base_idx + 5; count += (p_cells[5] > 0);
+    p_moves[count] = base_idx + 6; count += (p_cells[6] > 0);
+    p_moves[count] = base_idx + 7; count += (p_cells[7] > 0);
+    p_moves[count] = base_idx + 8; count += (p_cells[8] > 0);
 }
 // first player - 1, second player - -1, 0 - draw
 void ToguzNative::who_is_winner(int8_t winner) const {

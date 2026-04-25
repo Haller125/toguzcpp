@@ -8,7 +8,7 @@ auto deadline = std::chrono::steady_clock::now();
 
 namespace {
 
-constexpr int QUIESCENCE_MAX_PLY = 32;
+constexpr int QUIESCENCE_MAX_PLY = 6;
 
 bool should_stop_due_to_time(std::atomic<bool>& stop_search) {
     if ((nodes_count++ & 2047) == 0) {
@@ -103,7 +103,9 @@ int history_table[2][9] = {{0}};
 
 int search_depth(ToguzNative& node, int depth, int alpha, int beta, bool player, u_int8_t& best_move, TT& tt, ZobristHash& zobrist_hasher, std::atomic<bool>& stop_search) {
     if (depth == 0) {
-        return quiescence_search(node, alpha, beta, player, best_move, stop_search, 0);
+        return 
+        // quiescence_search(node, alpha, beta, player, best_move, stop_search, 0);
+        score(node, player);
     }
 
     if (should_stop_due_to_time(stop_search)) {
@@ -178,14 +180,18 @@ int search_depth(ToguzNative& node, int depth, int alpha, int beta, bool player,
     u_int8_t local_best_move = legal_moves_buffer[0]; // Default best move
     
     for (int i = 0; i < legal_count_buffer; ++i) {
-        ToguzNative child = node;
+        // ToguzNative child = node;
         u_int8_t move_idx = legal_moves_buffer[i];
-        child.move(move_idx);
+        // child.move(move_idx);
+
+        node.move(move_idx);
         
         u_int8_t child_best_move;
         
-        int value = -search_depth(child, depth - 1, -beta, -alpha, !player, child_best_move, tt, zobrist_hasher, stop_search);
+        int value = -search_depth(node, depth - 1, -beta, -alpha, !player, child_best_move, tt, zobrist_hasher, stop_search);
         
+        node.unmove();
+
         if (value > best_score) {
             best_score = value;
             local_best_move = legal_moves_buffer[i];

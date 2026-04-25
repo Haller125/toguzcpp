@@ -13,8 +13,8 @@ namespace {
 
 template <typename GameType>
 class ToguzDerivedTest : public ::testing::Test {
-  static_assert(std::is_base_of<Toguz, GameType>::value,
-                "GameType must derive from Toguz");
+  static_assert(std::is_same<GameType, ToguzNative>::value,
+                "GameType must be ToguzNative");
 };
 
 using ToguzImplementations = ::testing::Types<ToguzNative>;
@@ -31,6 +31,24 @@ std::uint32_t TotalStones(const GameType& game) {
     total += score;
   }
   return total;
+}
+
+struct GameSnapshot {
+  std::array<std::uint8_t, 32> cells;
+  std::array<std::uint8_t, 2> tuzdeks;
+  std::array<std::uint8_t, 2> scores;
+  int last_move_index;
+};
+
+GameSnapshot Snapshot(const ToguzNative& game) {
+  return {game.cells, game.tuzdeks, game.scores, game.last_move_index};
+}
+
+void ExpectSameState(const ToguzNative& game, const GameSnapshot& expected) {
+  EXPECT_EQ(game.cells, expected.cells);
+  EXPECT_EQ(game.tuzdeks, expected.tuzdeks);
+  EXPECT_EQ(game.scores, expected.scores);
+  EXPECT_EQ(game.last_move_index, expected.last_move_index);
 }
 
 TYPED_TEST(ToguzDerivedTest, InitialState) {
@@ -127,6 +145,77 @@ TYPED_TEST(ToguzDerivedTest, MoveFromCellWithOneStoneLeavesItEmpty) {
 
   EXPECT_EQ(game.cells[src_idx], 0);
   EXPECT_EQ(game.cells[dst_idx], 10);
+}
+
+TEST(ToguzNativeUnmoveTest, UnmoveWithoutHistoryDoesNothing) {
+  ToguzNative game;
+  const auto before = Snapshot(game);
+
+  game.unmove();
+
+  ExpectSameState(game, before);
+}
+
+TEST(ToguzNativeUnmoveTest, UnmoveRestoresStateAfterRegularMove) {
+  ToguzNative game;
+  const auto before = Snapshot(game);
+
+  game.move(0);
+  ASSERT_NE(game.cells, before.cells);
+
+  game.unmove();
+
+  ExpectSameState(game, before);
+}
+
+TEST(ToguzNativeUnmoveTest, UnmoveRestoresStateAfterSingleStoneCapture) {
+  ToguzNative game;
+  game.cells[8] = 1;
+  game.cells[9] = 5;
+  init_masks();
+  const auto before = Snapshot(game);
+
+  game.move(8);
+  ASSERT_NE(game.scores, before.scores);
+
+  game.unmove();
+
+  ExpectSameState(game, before);
+}
+
+TEST(ToguzNativeUnmoveTest, UnmoveRestoresStateAfterTuzdekCreation) {
+  ToguzNative game;
+  game.cells.fill(0);
+  game.scores.fill(0);
+  game.cells[7] = 4;
+  game.cells[10] = 2;
+  init_masks();
+  const auto before = Snapshot(game);
+
+  game.move(7);
+  ASSERT_NE(game.tuzdeks, before.tuzdeks);
+
+  game.unmove();
+
+  ExpectSameState(game, before);
+}
+
+TEST(ToguzNativeUnmoveTest, UnmoveIsLifoAcrossMultipleMoves) {
+  ToguzNative game;
+  init_masks();
+
+  const auto before_first = Snapshot(game);
+  game.move(0);
+
+  const auto before_second = Snapshot(game);
+  game.move(9);
+  ASSERT_NE(game.cells, before_second.cells);
+
+  game.unmove();
+  ExpectSameState(game, before_second);
+
+  game.unmove();
+  ExpectSameState(game, before_first);
 }
 
 TYPED_TEST(ToguzDerivedTest, CaptureWithSingleStoneMove) {
