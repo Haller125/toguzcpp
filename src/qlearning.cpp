@@ -316,9 +316,10 @@ namespace qlrng{
             for (int i = 0; i < episodes; ++i) {
                 ToguzNative game;
                 run_episode(game, i);
-                if ((i + 1) % 10000 == 0) {
-                    std::cout << "Episode " << (i + 1) << "/" << episodes << " completed. Q-table size: " << q_toguz_table.q_table.table.size() << std::endl;
-                    sanity_test_against_random(100); // Run a quick sanity test every 10000 episodes
+                if ((i + 1) % 1000 == 0) {
+                    float progress = static_cast<float>(i) / episodes;
+                    std::cout << "Progress: " << progress << " completed. Q-table size: " << q_toguz_table.q_table.table.size() << std::endl;
+                    sanity_test_against_random(1000); // Run a quick sanity test every 1000 episodes
                 }
             }
             save_q_table(save_filename);
